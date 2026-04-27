@@ -1,28 +1,33 @@
-# Real-Time Multimodal Streaming: Pharmaceutical Voice Assistant
+# Pharma Voice Assistant — Real-Time Multimodal Pharmaceutical Digital Twin
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Status: In Progress](https://img.shields.io/badge/status-in%20progress-orange.svg)]()
+[![Demo Tests](https://img.shields.io/badge/demo%20tests-15%2F15%20passing-brightgreen.svg)]()
+
+A voice-enabled GxP knowledge assistant — Gourav Pandey's "Digital Twin" — that accepts a
+typed or spoken question, retrieves grounded answers from a curated pharmaceutical SOP
+corpus using BM25 lexical search, and replies with synthesized speech, optionally
+lip-synced through a streaming HeyGen / LiveAvatar video.
 
 ---
 
-## Overview
+## Demo edition — what is bundled
 
-The Real-Time Multimodal Streaming project is a pharmaceutical expert voice assistant -- Gourav Pandey's "Digital Twin" -- that accepts voice input, processes queries through the pharmaceutical knowledge engine, and delivers responses via synthesized speech and optional avatar video. It combines Automatic Speech Recognition (ASR), large language model reasoning, text-to-speech synthesis, and avatar generation into a low-latency streaming pipeline designed for real-time conversational interaction with a pharmaceutical domain expert.
+This release ships with a focused, hand-written knowledge base of **five fundamental GxP
+SOPs** (~50 pages of professional content) so the system can be demonstrated end-to-end
+with no external corpus or paid LLM calls beyond TTS.
 
----
+| ID | SOP | What it covers |
+|---|---|---|
+| SOP-QA-001 | Good Documentation Practice (GDP) | ALCOA+ principles, paper corrections, electronic records, 21 CFR Part 11, audit trails |
+| SOP-QA-002 | Batch Record Review | Two-stage review, CPP/IPC checks, yield calculation and reconciliation, deviation triggers, release prerequisites |
+| SOP-QA-003 | Batch Release / Disposition | QP authority, decision inputs, conditional release per Annex 16, rejection, regulatory hold |
+| SOP-QA-004 | Change Control | Class 1 / 2 / 3 classification, impact assessment, regulatory filing triggers, effectiveness checks, CAPA linkage |
+| SOP-QA-005 | Deviation and CAPA Management | Level 1 / 2 / 3 classification, root cause analysis, CAPA hierarchy of effectiveness, trending, escalation |
 
-## Key Features
-
-| Feature | Description |
-|---|---|
-| **Text-to-Speech Pipeline** | High-quality speech synthesis via ElevenLabs, Google TTS, and HeyGen |
-| **Avatar Video Generation** | Realistic talking-head video via HeyGen integration |
-| **REST API** | HTTP endpoints for programmatic access to all modalities |
-| **Demo Frontend** | Browser-based interface for interactive demonstrations |
-| **Multi-Provider TTS** | Fallback chain across ElevenLabs, Google TTS for reliability |
-| **Pharmaceutical Domain** | Responses grounded in pharmaceutical compliance knowledge |
-| **Low-Latency Design** | Streaming architecture with latency budgets for each pipeline stage |
+Each SOP is written against current EU GMP, ICH Q9 (R1) / Q10, 21 CFR 211 / Part 11,
+PIC/S PI 041, and MHRA guidance. The same architecture scales unchanged to a 200K-document
+production brain.
 
 ---
 
@@ -31,264 +36,238 @@ The Real-Time Multimodal Streaming project is a pharmaceutical expert voice assi
 ```
 +================================================================+
 |              Real-Time Multimodal Pipeline                       |
-|================================================================|
-|                                                                  |
-|  +------------------+                                            |
-|  | Voice Input      |  (Microphone / Audio File)                 |
-|  +--------+---------+                                            |
-|           |                                                      |
-|           v                                                      |
-|  +--------+---------+                                            |
-|  | ASR (Whisper)    |  Speech-to-Text                            |
-|  | [Planned]        |  Target: < 500ms                           |
-|  +--------+---------+                                            |
-|           |                                                      |
-|           v                                                      |
-|  +--------+---------+     +-------------------+                  |
-|  | Query Engine     | --> | Knowledge Base    |                  |
-|  | (LLM + RAG)     |     | (Pharma Corpus)   |                  |
-|  +--------+---------+     +-------------------+                  |
-|           |                                                      |
-|           |  Target TTFT: < 800ms                                |
-|           v                                                      |
-|  +--------+---------+                                            |
-|  | TTS Engine       |  Text-to-Speech                            |
-|  | - ElevenLabs     |  Target TTFB: < 300ms                     |
-|  | - Google TTS     |                                            |
-|  +--------+---------+                                            |
-|           |                                                      |
-|           +---> Audio Stream --> Speaker / Browser                |
-|           |                                                      |
-|           v                                                      |
-|  +--------+---------+                                            |
-|  | Avatar Engine    |  (Optional)                                |
-|  | - HeyGen API     |  Video generation                         |
-|  +--------+---------+                                            |
-|           |                                                      |
-|           +---> Video Stream --> Browser                          |
-|                                                                  |
 +================================================================+
+|                                                                  |
+|  Browser  (frontend/index.html or avatar_frontend.html)          |
+|   - text input + Web Speech API mic                              |
+|   - HeyGen LiveAvatar SDK (streaming video)                      |
+|   - HTML5 audio for ElevenLabs TTS                               |
+|                                                                  |
+|             | /ask, /speak, /avatar/*                            |
+|             v                                                    |
+|                                                                  |
+|  Flask API  (src/api.py / start_server_with_avatar.py)           |
+|   - BM25 retrieval                                               |
+|   - ElevenLabs TTS  (audio/mpeg streamed back)                   |
+|   - HeyGen LiveAvatar token mint + video fallback                |
+|                                                                  |
+|             |                                                    |
+|             v                                                    |
+|                                                                  |
+|  BM25 search index  (brain_testing_v1.pkl)                       |
+|   - 148 chunks, 1663 unique terms, 154 KB                        |
+|   - k1=1.5, b=0.75                                               |
+|                                                                  |
+|             |  built from                                        |
+|             v                                                    |
+|                                                                  |
+|  sops_for_testing/  (5 markdown SOPs, ~50 pages)                 |
+|                                                                  |
++==================================================================+
 ```
 
----
-
-## Tech Stack
-
-- **Language:** Python 3.10+
-- **ASR:** OpenAI Whisper (planned)
-- **LLM:** OpenAI GPT-4 / Local Ollama models
-- **TTS:** ElevenLabs API, Google Cloud TTS
-- **Avatar:** HeyGen API
-- **Streaming:** WebSocket (planned), REST API (current)
-- **Frontend:** HTML/JavaScript demo interface
-- **API Framework:** FastAPI
+See `ARCHITECTURE.md` for stage-by-stage latency budgets and fallback paths.
 
 ---
 
-## Quick Start
+## Test prompts
+
+Fifteen prompts cover every SOP and every major topic. They render as clickable buttons
+in the UI and are also exposed at `GET /test_prompts` for programmatic access.
+
+| # | Question | Expected SOP |
+|---|---|---|
+| 1 | What are the ALCOA+ principles for data integrity? | GDP |
+| 2 | How should I correct an error in a paper batch record? | GDP |
+| 3 | What are the requirements for electronic records and audit trails per 21 CFR Part 11? | GDP |
+| 4 | How should I review a batch record before release? | Batch Record Review |
+| 5 | What are the critical process parameters for tablet manufacturing? | Batch Record Review |
+| 6 | How do I calculate batch yield and what are the acceptance limits? | Batch Record Review |
+| 7 | Who has the authority to make a batch disposition decision and what does the QP review? | Batch Release |
+| 8 | When can a batch be conditionally released? | Batch Release |
+| 9 | What triggers a batch rejection and how is regulatory hold managed? | Batch Release |
+| 10 | What is the change control process for a critical change? | Change Control |
+| 11 | How do I classify a change as Class 1, 2, or 3? | Change Control |
+| 12 | What is an effectiveness check for a change control? | Change Control |
+| 13 | What triggers a Level 1 critical deviation? | Deviation / CAPA |
+| 14 | When is a CAPA required and how should it be designed? | Deviation / CAPA |
+| 15 | How do I perform root cause analysis using 5 Whys or fishbone? | Deviation / CAPA |
+
+---
+
+## Test results (latest run)
+
+The bundled `run_tests.py` sends each prompt to `/ask`, verifies the answer is non-empty
+and references the expected SOP, and exercises `/speak` once.
+
+| Metric | Value |
+|---|---|
+| Prompts tested | 15 |
+| Passed | **15** |
+| Failed | 0 |
+| Pass rate | **100%** |
+| /ask median latency | ~2.07 s |
+| /speak round-trip | ~2.6 s for 44.8 KB MP3 |
+
+Full per-prompt output (answer + sources + response time) is in `test_results.json`.
+
+---
+
+## Use cases
+
+1. **Pharmaceutical training and onboarding** — new hires self-serve answers about GDP,
+   batch review, change control, and CAPA without blocking a senior SME.
+2. **GMP compliance Q&A assistant** — shop-floor operators and QC analysts get instant,
+   sourced answers about the right corrective action, the correct SOP step, or the
+   classification of a change.
+3. **Audit preparation support** — the SME team rehearses against a voice agent that
+   quotes back actual SOP language an auditor will see.
+4. **Real-time shop floor guidance** — voice-first interface keeps operators hands-free;
+   the avatar puts a face on a process that would otherwise be a paper SOP binder.
+5. **Knowledge preservation (employee digital twin)** — codify a senior expert's answers
+   into the corpus so institutional knowledge survives turnover and retirement.
+6. **Regulatory inspection readiness** — front-line staff rehearse against questions
+   inspectors typically ask ("what triggers a Level 1 deviation?", "what does ALCOA+
+   require for paper records?").
+7. **Cross-functional GxP education** — manufacturing, QC, regulatory, and IT teams
+   share a single source of truth phrased in plain language with citations.
+8. **Remote expert consultation** — LiveAvatar mode lets a remote SME's voice and face
+   answer questions in real time, lowering the barrier to async support.
+
+---
+
+## Setup
 
 ### Prerequisites
+- Python 3.10+
+- A modern Chrome / Edge browser (the Web Speech API powers the mic).
+- API keys (paid services — only needed for the spoken / video paths):
+  - **ElevenLabs** — text-to-speech.
+  - **HeyGen LiveAvatar** — real-time streaming avatar.
+  - **HeyGen video** — pre-rendered fallback.
 
-- Python 3.10 or higher
-- API keys: ElevenLabs and/or Google Cloud TTS
-- Optional: HeyGen API key (for avatar video)
-
-### Installation
+### Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/gauravpandey36/pharma-voice-assistant.git
 cd pharma-voice-assistant
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Configure API keys
-export ELEVENLABS_API_KEY="your-key"
-export GOOGLE_TTS_API_KEY="your-key"
-export HEYGEN_API_KEY="your-key"  # Optional
 ```
 
-### Launch the Assistant
+### Configure
+
+Create `config.json` in the project root:
+
+```json
+{
+  "elevenlabs_api_key": "sk_...",
+  "elevenlabs_voice_id": "your_voice_id",
+  "liveavatar_api_key": "...",
+  "liveavatar_avatar_id": "...",
+  "heygen_api_key": "...",
+  "heygen_avatar_id": "...",
+  "heygen_voice_id": "...",
+  "tts_engine": "elevenlabs"
+}
+```
+
+### Build the demo brain
 
 ```bash
-# Start the API server
-python server.py --port 8000
-
-# Open the demo frontend
-open http://localhost:8000/demo
+python build_testing_brain.py
 ```
+
+Produces `brain_testing_v1.pkl` (~150 KB, 148 chunks, 1663 unique terms) from the five
+SOPs in `sops_for_testing/`.
+
+### Run the server
+
+```bash
+python start_server_with_avatar.py
+```
+
+The server defaults to `brain_testing_v1.pkl`. To switch to the full production brain:
+
+```bash
+BRAIN_FILE=search_index.pkl python start_server_with_avatar.py
+```
+
+Open <http://localhost:5000> in Chrome. The avatar auto-starts on page load (or first
+user gesture if the browser blocks autoplay) and the test prompts render as buttons.
+
+### Run the tests
+
+```bash
+python run_tests.py
+```
+
+Writes `test_results.json` and prints a pass/fail summary.
 
 ---
 
-## Usage Examples
+## Endpoints
 
-### Text-to-Speech via API
-
-```bash
-# Generate speech from text
-curl -X POST http://localhost:8000/tts \
-  -H "Content-Type: application/json" \
-  -d '{"text": "The maximum hold time for Buffer A is 24 hours at 2 to 8 degrees Celsius.", "provider": "elevenlabs"}' \
-  --output response.mp3
-```
-
-### Avatar Video Generation
-
-```bash
-# Generate a talking-head video
-curl -X POST http://localhost:8000/avatar \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Welcome to the pharmaceutical compliance briefing.", "avatar_id": "default"}' \
-  --output briefing.mp4
-```
-
-### Full Pipeline (Planned)
-
-```bash
-# Stream a voice query end-to-end
-# 1. User speaks into microphone
-# 2. ASR transcribes speech to text
-# 3. Query engine retrieves answer from knowledge base
-# 4. TTS synthesizes response audio
-# 5. Audio streams back to user in real-time
-```
-
-### Python SDK
-
-```python
-from voice_assistant import PharmaVoiceAssistant
-
-assistant = PharmaVoiceAssistant(
-    tts_provider="elevenlabs",
-    knowledge_base="pharma_corpus"
-)
-
-# Text query with audio response
-audio = assistant.ask("What are the stability requirements for API storage?")
-audio.play()
-
-# With avatar video
-video = assistant.ask(
-    "Explain the difference between OQ and PQ.",
-    avatar=True
-)
-video.save("explanation.mp4")
-```
+| Method | Path | Purpose |
+|---|---|---|
+| GET  | `/` | Serves the avatar frontend |
+| GET  | `/health` | Liveness + brain mode + integration status |
+| GET  | `/brain_info` | Loaded brain file, document count, SOP list |
+| GET  | `/test_prompts` | The 15 demo prompts (rendered as buttons) |
+| POST | `/ask` | `{ "query": "..." }` -> `{ "answer", "sources" }` |
+| POST | `/speak` | `{ "text": "..." }` -> `audio/mpeg` |
+| POST | `/avatar/token` | Mints a LiveAvatar streaming session token |
+| POST | `/avatar/video` | Generates and polls a pre-rendered HeyGen video |
 
 ---
 
-## Latency Budget
+## Test evidence
 
-End-to-end voice interaction must feel conversational. The target latency budget:
-
-| Stage | Component | Target Latency | Status |
-|---|---|---|---|
-| 1 | ASR (Speech to Text) | < 500 ms | Planned |
-| 2 | LLM Time-to-First-Token | < 800 ms | In Progress |
-| 3 | TTS Time-to-First-Byte | < 300 ms | Done |
-| 4 | Network + Buffering | < 200 ms | In Progress |
-| **Total** | **End-to-End** | **< 1,800 ms** | **Target** |
-
-### Graceful Degradation Strategy
-
-When latency budgets are exceeded, the system degrades gracefully:
-
-| Condition | Fallback Behavior |
-|---|---|
-| ElevenLabs API slow/down | Switch to Google TTS |
-| Google TTS slow/down | Switch to local pyttsx3 (lower quality) |
-| HeyGen API slow/down | Audio-only response (skip avatar) |
-| LLM timeout | Return cached response for common queries |
-| ASR failure | Prompt user for text input |
+- `test_prompts.json` — the curated 15-question test set.
+- `test_results.json` — full server responses for the most recent run (15/15 passing).
+- `brain_testing_v1_stats.json` — index size and per-SOP chunk counts.
 
 ---
 
-## Current Status
-
-### Completed
-
-- [x] ElevenLabs TTS integration
-- [x] Google Cloud TTS integration
-- [x] HeyGen avatar video generation
-- [x] REST API server
-- [x] Demo frontend interface
-- [x] Multi-provider TTS fallback chain
-- [x] Audio file generation and playback
-
-### In Progress
-
-- [ ] WebSocket streaming for real-time audio delivery
-- [ ] Latency budgeting and monitoring per pipeline stage
-- [ ] LLM integration with pharmaceutical knowledge base
-
-### Planned
-
-- [ ] ASR input via OpenAI Whisper
-- [ ] Full voice-to-voice pipeline
-- [ ] Graceful degradation logic
-- [ ] Conversation context management
-- [ ] WebRTC for browser-based voice input
-- [ ] Streaming TTS (chunk-by-chunk audio delivery)
-
----
-
-## Project Structure
+## Repository layout
 
 ```
 pharma-voice-assistant/
-├── server.py                  # FastAPI server with all endpoints
-├── tts/
-│   ├── elevenlabs_client.py   # ElevenLabs TTS integration
-│   ├── google_tts_client.py   # Google Cloud TTS integration
-│   ├── local_tts.py           # Local pyttsx3 fallback
-│   └── router.py              # TTS provider selection and fallback
-├── asr/
-│   └── whisper_client.py      # Whisper ASR integration (planned)
-├── avatar/
-│   └── heygen_client.py       # HeyGen avatar video generation
-├── knowledge/
-│   └── query_engine.py        # Pharmaceutical knowledge retrieval
-├── streaming/
-│   └── websocket_handler.py   # WebSocket streaming (planned)
-├── frontend/
-│   ├── index.html             # Demo web interface
-│   ├── app.js                 # Frontend application logic
-│   └── styles.css             # Interface styling
-├── tests/
-├── requirements.txt
-└── README.md
++-- README.md                              # this file
++-- ARCHITECTURE.md                        # stage-by-stage architecture
++-- Makefile                               # build / test convenience targets
++-- requirements.txt
++-- src/
+|   +-- api.py                             # core API (modular)
+|   +-- asr.py
+|   +-- avatar.py
+|   +-- graceful_degradation.py
+|   +-- llm_engine.py
+|   +-- pipeline.py
+|   +-- tts.py
+|   +-- websocket_server.py
++-- frontend/
+|   +-- index.html                         # browser UI
++-- start_server_with_avatar.py            # demo Flask server (BM25 + TTS + avatar)
++-- avatar_frontend.html                   # demo UI (chat + mic + avatar)
++-- build_testing_brain.py                 # rebuilds brain_testing_v1.pkl
++-- brain_testing_v1.pkl                   # demo BM25 index (5 SOPs)
++-- brain_testing_v1_stats.json
++-- sops_for_testing/                      # demo SOP corpus
+|   +-- SOP-001-Good-Documentation-Practice.md
+|   +-- SOP-002-Batch-Record-Review.md
+|   +-- SOP-003-Batch-Release-Disposition.md
+|   +-- SOP-004-Change-Control.md
+|   +-- SOP-005-Deviation-CAPA-Management.md
++-- test_prompts.json
++-- run_tests.py
++-- test_results.json
 ```
 
 ---
 
-## Contributing
+## License & disclaimer
 
-Contributions are welcome. To contribute:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Write tests for new functionality
-4. Ensure all existing tests pass
-5. Submit a pull request with a clear description of changes
-
----
-
-## License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
-
----
-
-## Author
-
-**Gourav Pandey**
-GitHub: [@gauravpandey36](https://github.com/gauravpandey36)
-
----
-
-*Part of the [AI for Regulated Life Sciences](../MASTER_README.md) project portfolio.*
+MIT license. The included SOPs are illustrative and reference current guidance, but
+**must not be used as company SOPs** without organisation-specific adaptation, review,
+and formal approval. Always rely on your own quality system and qualified personnel
+for regulated activities.
